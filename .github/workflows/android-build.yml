@@ -19,7 +19,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. 安装 Node.js
+      # 2. 安装 Node.js 22
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -33,22 +33,26 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      # 4. 安装 Android SDK
+      # 4. 初始化 Android SDK
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
 
-      # 5. 安装 Android API 36
+      # 5. 安装 Android SDK 所需组件
       - name: Install Android SDK packages
         run: |
           sdkmanager "platform-tools"
           sdkmanager "platforms;android-36"
           sdkmanager "build-tools;36.0.0"
 
-      # 6. 安装原项目依赖
+      # 6. 安装项目依赖
       - name: Install dependencies
         run: npm ci
 
-      # 7. 临时安装 Capacitor 8
+      # 7. 安装 Capacitor 8
       - name: Install Capacitor 8
         run: |
           npm install --no-save --no-audit --no-fund \
@@ -64,7 +68,7 @@ jobs:
       - name: Unit Tests
         run: npm run test -- --run
 
-      # 10. 生成 Web 页面
+      # 10. 构建 Web 页面
       - name: Build Web
         run: npm run build
 
@@ -72,24 +76,24 @@ jobs:
       - name: Add Android Platform
         run: npx cap add android
 
-      # 12. 同步 Web 文件到 Android
+      # 12. 同步 Web 文件
       - name: Capacitor Sync
         run: npx cap sync android
 
-      # 13. 构建 APK
+      # 13. 构建 Debug APK
       - name: Build Debug APK
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
-      # 14. 扫描依赖漏洞
+      # 14. 生成依赖安全报告
       - name: Dependency Security Report
         if: always()
         run: |
           npm audit --json > npm-audit.json || true
 
-      # 15. 上传 APK 和扫描结果
+      # 15. 上传 APK 和安全报告
       - name: Upload Build Artifacts
         if: always()
         uses: actions/upload-artifact@v4

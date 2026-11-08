@@ -1,0 +1,102 @@
+name: HAX07Tools Android Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android-build:
+
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 60
+
+    steps:
+
+      # 1. 获取项目源码
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. 安装 Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # 3. 安装 Java 21
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # 4. 安装 Android SDK
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # 5. 安装 Android API 36
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager "platform-tools"
+          sdkmanager "platforms;android-36"
+          sdkmanager "build-tools;36.0.0"
+
+      # 6. 安装原项目依赖
+      - name: Install dependencies
+        run: npm ci
+
+      # 7. 临时安装 Capacitor 8
+      - name: Install Capacitor 8
+        run: |
+          npm install --no-save --no-audit --no-fund \
+            @capacitor/core@^8 \
+            @capacitor/cli@^8 \
+            @capacitor/android@^8
+
+      # 8. TypeScript 类型检查
+      - name: TypeScript Check
+        run: npm run typecheck
+
+      # 9. 单元测试
+      - name: Unit Tests
+        run: npm run test -- --run
+
+      # 10. 生成 Web 页面
+      - name: Build Web
+        run: npm run build
+
+      # 11. 创建 Android 工程
+      - name: Add Android Platform
+        run: npx cap add android
+
+      # 12. 同步 Web 文件到 Android
+      - name: Capacitor Sync
+        run: npx cap sync android
+
+      # 13. 构建 APK
+      - name: Build Debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      # 14. 扫描依赖漏洞
+      - name: Dependency Security Report
+        if: always()
+        run: |
+          npm audit --json > npm-audit.json || true
+
+      # 15. 上传 APK 和扫描结果
+      - name: Upload Build Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HAX07Tools-0.7.0
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            npm-audit.json
+          if-no-files-found: warn
+          retention-days: 14
